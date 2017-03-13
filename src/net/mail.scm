@@ -68,25 +68,32 @@
                            (with-output-to-string (lambda () (with-input-from-file file (lambda () (base64-encode)))))))
 
 (define (simple-message subject text . encoding) 
- (define str-port (open-output-string))
- (if (null? encoding) (set! encoding "ISO2022JP"))
- (copy-port
+  (define subject-port (open-output-string))
+  (define text-port (open-output-string))
+  (if (null? encoding) (set! encoding '("ISO-2022-JP")))
+  (copy-port
    (open-input-conversion-port
-     (open-input-string text)
-     "UTF-8" :to-code encoding)
-   str-port)
- (with-fields 
-   `(("Content-Type" "text/plain; charset=ISO-2022-JP") ("Subject" ,subject))
-    (get-output-string str-port)))
+    (open-input-string subject)
+    "*JP" :to-code (car encoding))
+   subject-port)
+  (copy-port
+   (open-input-conversion-port
+    (open-input-string text)
+    "*JP" :to-code (car encoding))
+   text-port)
+  (with-fields 
+   `(("Content-Type" "text/plain; charset=ISO-2022-JP")
+     ("Subject" ,(get-output-string subject-port)))
+   (get-output-string text-port)))
 
 (define (mime-multipart-message subject parts) 
   (define boundary "_BOUNDARY_+FKuIwojIA.fw78Q-Op9A8_JkoFW8oQjVv.iK+")
   (fold 
-    (lambda (part s) 
-      (string-append s (mime-part part boundary)))
-    (with-fields 
-       `(("Content-Type" ,(format "multipart/mixed; boundary=~a" boundary))
-         ("Subject" ,subject)) "")
+   (lambda (part s) 
+     (string-append s (mime-part part boundary)))
+   (with-fields 
+    `(("Content-Type" ,(format "multipart/mixed; boundary=~a" boundary))
+      ("Subject" ,subject)) "")
     parts))
 
 (define (x->address s) s)
