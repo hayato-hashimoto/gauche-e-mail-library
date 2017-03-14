@@ -61,10 +61,17 @@
 (define (mime-part-end boundary)
   (string-append "\r\n--" boundary "--"))
 
-(define (mime-attach-file file) 
+(define (mime-attach-file file . encoding)
+  (define file-port (open-output-string))
+  (if (null? encoding) (set! encoding '("ISO-2022-JP")))
+  (copy-port
+   (open-input-conversion-port
+    (open-input-string file)
+    "*JP" :to-code (car encoding))
+   file-port)
    (with-fields `(("Content-Type" ,"text/plain")
                   ("Content-Transfer-Encoding" "base64")
-                  ("Content-Disposition" ,(format "attachment; filename=\"~a\"" file)))
+                  ("Content-Disposition" ,(format "attachment; filename=\"~a\"" (get-output-string file-port))))
                            (with-output-to-string (lambda () (with-input-from-file file (lambda () (base64-encode)))))))
 
 (define (simple-message subject text . encoding) 
@@ -86,14 +93,21 @@
      ("Subject" ,(get-output-string subject-port)))
    (get-output-string text-port)))
 
-(define (mime-multipart-message subject parts) 
+(define (mime-multipart-message subject parts . encoding) 
   (define boundary "_BOUNDARY_+FKuIwojIA.fw78Q-Op9A8_JkoFW8oQjVv.iK+")
+  (define subject-port (open-output-string))
+  (if (null? encoding) (set! encoding '("ISO-2022-JP")))
+  (copy-port
+   (open-input-conversion-port
+    (open-input-string subject)
+    "*JP" :to-code (car encoding))
+   subject-port)
   (fold 
    (lambda (part s) 
      (string-append s (mime-part part boundary)))
    (with-fields 
     `(("Content-Type" ,(format "multipart/mixed; boundary=~a" boundary))
-      ("Subject" ,subject)) "")
+      ("Subject" ,(get-output-string subject-port))) "")
     parts))
 
 (define (x->address s) s)
